@@ -33,8 +33,10 @@ class MainActivity : AppCompatActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         
-        // OSMDroid 需要在載入 layout 前初始化
-        Configuration.getInstance().load(this, PreferenceManager.getDefaultSharedPreferences(this))
+        // OSMDroid 需要在載入 layout 前初始化，並設定 User-Agent 以免被封鎖圖資
+        val ctx = applicationContext
+        Configuration.getInstance().userAgentValue = packageName
+        Configuration.getInstance().load(ctx, PreferenceManager.getDefaultSharedPreferences(ctx))
         
         setContentView(R.layout.activity_main)
 
@@ -59,6 +61,47 @@ class MainActivity : AppCompatActivity() {
         routePlanner = RoutePlanner(movementEngine)
 
         mockLocationManager.setupMockProvider()
+
+        // 搖桿對接
+        val joystick = findViewById<JoystickView>(R.id.joystickView)
+        joystick.setJoystickListener(object : JoystickView.JoystickListener {
+            override fun onJoystickMoved(angle: Double, strength: Double) {
+                if (strength > 0) {
+                    // 將搖桿角度與力度轉換為位移指令
+                    // 力度 0.0-1.0 對應 15-20km/h
+                    val speed = 15.0 + (strength * 5.0)
+                    val rad = Math.toRadians(angle)
+                    val nextLat = userMarker.position.latitude + (Math.cos(rad) * 0.0001)
+                    val nextLng = userMarker.position.longitude + (Math.sin(rad) * 0.0001)
+                    
+                    val jittered = movementEngine.applyGaussianJitter(nextLat, nextLng)
+                    mockLocationManager.setMockLocation(jittered.first, jittered.second, 0.0)
+                    
+                    val newPoint = GeoPoint(jittered.first, jittered.second)
+                    userMarker.position = newPoint
+                    map.invalidate()
+                }
+            }
+        })
+
+        // 地圖長按取點
+        val eventsOverlay = org.osmdroid.views.overlay.MapEventsOverlay(object : org.osmdroid.events.MapEventsReceiver {
+            override fun singleTapConfirmedHelper(p: GeoPoint?): Boolean = false
+            override fun longPressHelper(p: GeoPoint?): Boolean {
+                p?.let {
+                    Toast.makeText(this@MainActivity, "設定目的地: ${it.latitude}, ${it.longitude}", Toast.LENGTH_SHORT).show()
+                    val waypoints = listOf(
+                        Pair(userMarker.position.latitude, userMarker.position.longitude),
+                        Pair(it.latitude, it.longitude)
+                    )
+                    currentPath = routePlanner.planRoute(waypoints, 5.0)
+                    currentIndex = 0
+                    startAutoWalk()
+                }
+                return true
+            }
+        })
+        map.overlays.add(0, eventsOverlay)
 
         val btnStart = findViewById<Button>(R.id.btn_start_auto_walk)
         val btnStop = findViewById<Button>(R.id.btn_stop_auto_walk)

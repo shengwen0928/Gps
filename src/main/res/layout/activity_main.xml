@@ -19,6 +19,15 @@
         android:layout_height="0dp"
         android:layout_weight="1" />
 
+    <!-- 搖桿容器 -->
+    <FrameLayout
+        android:id="@+id/joystick_container"
+        android:layout_width="match_parent"
+        android:layout_height="200dp"
+        android:background="#11000000">
+        <include layout="@layout/layout_joystick" />
+    </FrameLayout>
+
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
