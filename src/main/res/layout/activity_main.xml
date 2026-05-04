@@ -2,41 +2,40 @@
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:orientation="vertical"
-    android:padding="16dp">
+    android:orientation="vertical">
 
     <TextView
         android:id="@+id/text_status"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:text="Fake GPS - 路徑導航"
+        android:padding="16dp"
+        android:text="Fake GPS - 擬真導航模式"
         android:textSize="18sp"
         android:textStyle="bold" />
 
-    <View
+    <org.osmdroid.views.MapView
+        android:id="@+id/map"
         android:layout_width="match_parent"
-        android:layout_height="300dp"
-        android:layout_marginTop="16dp"
-        android:background="#CCCCCC" />
-    
-    <TextView
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:gravity="center"
-        android:text="[地圖 SDK 佔位符]"
-        android:textColor="#666666" />
+        android:layout_height="0dp"
+        android:layout_weight="1" />
 
-    <Button
-        android:id="@+id/btn_start_auto_walk"
+    <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:layout_marginTop="16dp"
-        android:text="開始自動行走" />
+        android:orientation="vertical"
+        android:padding="16dp">
 
-    <Button
-        android:id="@+id/btn_stop_auto_walk"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:text="停止自動行走" />
+        <Button
+            android:id="@+id/btn_start_auto_walk"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="開始自動行走 (15-20km/h)" />
+
+        <Button
+            android:id="@+id/btn_stop_auto_walk"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="停止自動行走" />
+    </LinearLayout>
 
 </LinearLayout>

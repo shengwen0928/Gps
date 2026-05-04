@@ -6,16 +6,24 @@ import android.os.Looper
 import android.widget.Button
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
+import androidx.preference.PreferenceManager
 import com.fakegps.R
 import com.fakegps.core.MockLocationManager
 import com.fakegps.engine.MovementEngine
 import com.fakegps.map.RoutePlanner
+import org.osmdroid.config.Configuration
+import org.osmdroid.tileprovider.tilesource.TileSourceFactory
+import org.osmdroid.util.GeoPoint
+import org.osmdroid.views.MapView
+import org.osmdroid.views.overlay.Marker
 
 class MainActivity : AppCompatActivity() {
 
+    private lateinit var map: MapView
     private lateinit var mockLocationManager: MockLocationManager
     private lateinit var movementEngine: MovementEngine
     private lateinit var routePlanner: RoutePlanner
+    private lateinit var userMarker: Marker
 
     private var isAutoWalking = false
     private val handler = Handler(Looper.getMainLooper())
@@ -24,13 +32,32 @@ class MainActivity : AppCompatActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        
+        // OSMDroid 需要在載入 layout 前初始化
+        Configuration.getInstance().load(this, PreferenceManager.getDefaultSharedPreferences(this))
+        
         setContentView(R.layout.activity_main)
+
+        map = findViewById(R.id.map)
+        map.setTileSource(TileSourceFactory.MAPNIK)
+        map.setMultiTouchControls(true)
+        val mapController = map.controller
+        mapController.setZoom(18.0)
+        
+        // 初始位置設定在台北 101
+        val startPoint = GeoPoint(25.0330, 121.5654)
+        mapController.setCenter(startPoint)
+
+        userMarker = Marker(map)
+        userMarker.position = startPoint
+        userMarker.setAnchor(Marker.ANCHOR_CENTER, Marker.ANCHOR_BOTTOM)
+        userMarker.title = "目前模擬位置"
+        map.overlays.add(userMarker)
 
         mockLocationManager = MockLocationManager(this)
         movementEngine = MovementEngine()
         routePlanner = RoutePlanner(movementEngine)
 
-        // 初始化模擬位置提供者
         mockLocationManager.setupMockProvider()
 
         val btnStart = findViewById<Button>(R.id.btn_start_auto_walk)
@@ -48,19 +75,19 @@ class MainActivity : AppCompatActivity() {
     private fun startAutoWalk() {
         if (isAutoWalking) return
 
-        // 模擬選取的座標點 (Waypoint)
         val waypoints = listOf(
-            Pair(25.0330, 121.5654), // 台北101
+            Pair(25.0330, 121.5654),
             Pair(25.0335, 121.5660),
             Pair(25.0340, 121.5670),
-            Pair(25.0345, 121.5680)
+            Pair(25.0345, 121.5680),
+            Pair(25.0330, 121.5654) // 返回原點
         )
 
         currentPath = routePlanner.planRoute(waypoints, 2.0)
         currentIndex = 0
         isAutoWalking = true
 
-        Toast.makeText(this, "開始自動行走", Toast.LENGTH_SHORT).show()
+        Toast.makeText(this, "開始自動擬真行走 (15-20km/h)", Toast.LENGTH_SHORT).show()
         autoWalkRunnable.run()
     }
 
@@ -81,29 +108,31 @@ class MainActivity : AppCompatActivity() {
                 lastLng = target.second
             }
 
-            // 使用 MovementEngine 計算下一個位置，確保速度與間隔符合擬真邏輯
-            // 這裡假設期望速度為 18km/h，間隔為 1000ms
             val nextLoc = movementEngine.calculateNextLocation(
                 lastLat, lastLng,
                 target.first, target.second,
                 18.0, 1000
             )
 
-            // 增加隨機抖動以增加擬真度
             val jitteredLoc = movementEngine.applyGaussianJitter(nextLoc.first, nextLoc.second)
 
+            // 更新系統模擬位置
             mockLocationManager.setMockLocation(jitteredLoc.first, jitteredLoc.second, 0.0)
+            
+            // 更新地圖上的標記位置
+            val newPoint = GeoPoint(jitteredLoc.first, jitteredLoc.second)
+            userMarker.position = newPoint
+            map.controller.animateTo(newPoint)
+            map.invalidate()
             
             lastLat = jitteredLoc.first
             lastLng = jitteredLoc.second
 
-            // 如果已經接近目標點，則移動到下一個路徑點
             val distToTarget = movementEngine.calculateDistance(lastLat, lastLng, target.first, target.second)
             if (distToTarget < 1.0) {
                 currentIndex++
             }
             
-            // 每秒移動一次
             handler.postDelayed(this, 1000)
         }
     }
@@ -111,7 +140,17 @@ class MainActivity : AppCompatActivity() {
     private fun stopAutoWalk() {
         isAutoWalking = false
         handler.removeCallbacks(autoWalkRunnable)
-        Toast.makeText(this, "停止自動行走", Toast.LENGTH_SHORT).show()
+        Toast.makeText(this, "停止行走", Toast.LENGTH_SHORT).show()
+    }
+
+    override fun onResume() {
+        super.onResume()
+        map.onResume()
+    }
+
+    override fun onPause() {
+        super.onPause()
+        map.onPause()
     }
 
     override fun onDestroy() {
