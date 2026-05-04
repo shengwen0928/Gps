@@ -33,14 +33,14 @@
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:orientation="horizontal"
-            android:gap="8dp">
+            android:orientation="horizontal">
 
             <Button
                 android:id="@+id/btn_start_auto_walk"
                 android:layout_width="0dp"
                 android:layout_height="wrap_content"
                 android:layout_weight="1"
+                android:layout_marginEnd="8dp"
                 android:text="開始行走"
                 android:alpha="0.8" />
 
