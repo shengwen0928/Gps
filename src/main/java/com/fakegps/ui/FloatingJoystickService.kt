@@ -76,8 +76,9 @@ class FloatingJoystickService : Service() {
                 if (strength > 0) {
                     val rad = Math.toRadians(angle)
                     // 力度 0.0-1.0 對應位移量
-                    currentLat += (Math.cos(rad) * 0.0001)
-                    currentLng += (Math.sin(rad) * 0.0001)
+                    // 修正：0度為東(cos), 90度為北(sin)
+                    currentLat += (Math.sin(rad) * 0.0001)
+                    currentLng += (Math.cos(rad) * 0.0001)
                     
                     val jittered = movementEngine.applyGaussianJitter(currentLat, currentLng)
                     mockLocationManager.setMockLocation(jittered.first, jittered.second, 0.0)

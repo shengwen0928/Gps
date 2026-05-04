@@ -3,17 +3,22 @@ package com.fakegps.ui
 import android.Manifest
 import android.content.Intent
 import android.content.pm.PackageManager
+import android.graphics.Color
 import android.net.Uri
 import android.os.Build
 import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
 import android.provider.Settings
+import android.view.View
+import android.view.WindowInsets
+import android.view.WindowInsetsController
 import android.widget.Button
 import android.widget.Toast
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.content.ContextCompat
+import androidx.core.view.WindowCompat
 import androidx.preference.PreferenceManager
 import com.google.android.gms.location.LocationServices
 import com.google.android.gms.location.Priority
@@ -43,16 +48,39 @@ class MainActivity : AppCompatActivity() {
     private val locationPermissionRequest = registerForActivityResult(
         ActivityResultContracts.RequestMultiplePermissions()
     ) { permissions ->
-        if (permissions[Manifest.permission.ACCESS_FINE_LOCATION] == true ||
-            permissions[Manifest.permission.ACCESS_COARSE_LOCATION] == true) {
+        val granted = permissions[Manifest.permission.ACCESS_FINE_LOCATION] == true ||
+                      permissions[Manifest.permission.ACCESS_COARSE_LOCATION] == true
+        if (granted) {
             initCurrentLocation()
+            checkBackgroundLocationPermission()
+        } else {
+            Toast.makeText(this, "需要定位權限才能獲取目前位置", Toast.LENGTH_LONG).show()
         }
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         
-        // OSMDroid 需要在載入 layout 前初始化，並設定 User-Agent 以免被封鎖圖資
+        // 1. 設置真正全螢幕（沉浸式）
+        WindowCompat.setDecorFitsSystemWindows(window, false)
+        window.statusBarColor = Color.TRANSPARENT
+        window.navigationBarColor = Color.TRANSPARENT
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+            window.insetsController?.let {
+                it.systemBarsBehavior = WindowInsetsController.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
+                it.hide(WindowInsets.Type.statusBars() or WindowInsets.Type.navigationBars())
+            }
+        } else {
+            @Suppress("DEPRECATION")
+            window.decorView.systemUiVisibility = (View.SYSTEM_UI_FLAG_LAYOUT_STABLE
+                    or View.SYSTEM_UI_FLAG_LAYOUT_FULLSCREEN
+                    or View.SYSTEM_UI_FLAG_LAYOUT_HIDE_NAVIGATION
+                    or View.SYSTEM_UI_FLAG_FULLSCREEN
+                    or View.SYSTEM_UI_FLAG_HIDE_NAVIGATION
+                    or View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY)
+        }
+
+        // OSMDroid 初始化
         val ctx = applicationContext
         Configuration.getInstance().userAgentValue = packageName
         Configuration.getInstance().load(ctx, PreferenceManager.getDefaultSharedPreferences(ctx))
@@ -77,11 +105,27 @@ class MainActivity : AppCompatActivity() {
         mockLocationManager.setupMockProvider()
 
         // 檢查並請求權限
-        if (ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED) {
-            locationPermissionRequest.launch(arrayOf(Manifest.permission.ACCESS_FINE_LOCATION, Manifest.permission.ACCESS_COARSE_LOCATION))
-        } else {
-            initCurrentLocation()
-        }
+        requestPermissions()
+
+        // 搖桿對接 (內建隱藏版)
+        val joystick = findViewById<JoystickView>(R.id.joystickView)
+        joystick.setJoystickListener(object : JoystickView.JoystickListener {
+            override fun onJoystickMoved(angle: Double, strength: Double) {
+                if (strength > 0) {
+                    val rad = Math.toRadians(angle)
+                    // 修正：0度為東(cos), 90度為北(sin)
+                    val nextLat = userMarker.position.latitude + (Math.sin(rad) * 0.0001)
+                    val nextLng = userMarker.position.longitude + (Math.cos(rad) * 0.0001)
+                    
+                    val jittered = movementEngine.applyGaussianJitter(nextLat, nextLng)
+                    mockLocationManager.setMockLocation(jittered.first, jittered.second, 0.0)
+                    
+                    val newPoint = GeoPoint(jittered.first, jittered.second)
+                    userMarker.position = newPoint
+                    map.invalidate()
+                }
+            }
+        })
 
         // 地圖單擊與長按取點
         val eventsOverlay = org.osmdroid.views.overlay.MapEventsOverlay(object : org.osmdroid.events.MapEventsReceiver {
@@ -146,20 +190,41 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
+    private fun requestPermissions() {
+        val permissions = mutableListOf(
+            Manifest.permission.ACCESS_FINE_LOCATION,
+            Manifest.permission.ACCESS_COARSE_LOCATION
+        )
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            permissions.add(Manifest.permission.POST_NOTIFICATIONS)
+        }
+        
+        locationPermissionRequest.launch(permissions.toTypedArray())
+    }
+
+    private fun checkBackgroundLocationPermission() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            if (ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_BACKGROUND_LOCATION) != PackageManager.PERMISSION_GRANTED) {
+                Toast.makeText(this, "請在設定中將定位權限改為「一律允許」，以支援背景搖桿功能", Toast.LENGTH_LONG).show()
+            }
+        }
+    }
+
     private fun initCurrentLocation() {
         val fusedLocationClient = LocationServices.getFusedLocationProviderClient(this)
         try {
-            fusedLocationClient.lastLocation.addOnSuccessListener { location ->
-                val startPoint = if (location != null) {
-                    GeoPoint(location.latitude, location.longitude)
-                } else {
-                    GeoPoint(25.0330, 121.5654) // 預設台北 101
+            fusedLocationClient.getCurrentLocation(Priority.PRIORITY_HIGH_ACCURACY, null)
+                .addOnSuccessListener { location ->
+                    val startPoint = if (location != null) {
+                        GeoPoint(location.latitude, location.longitude)
+                    } else {
+                        GeoPoint(25.0330, 121.5654) // 預設台北 101
+                    }
+                    map.controller.setCenter(startPoint)
+                    userMarker.position = startPoint
+                    mockLocationManager.setMockLocation(startPoint.latitude, startPoint.longitude, 0.0)
+                    map.invalidate()
                 }
-                map.controller.setCenter(startPoint)
-                userMarker.position = startPoint
-                mockLocationManager.setMockLocation(startPoint.latitude, startPoint.longitude, 0.0)
-                map.invalidate()
-            }
         } catch (e: SecurityException) {
             // Permission denied
         }

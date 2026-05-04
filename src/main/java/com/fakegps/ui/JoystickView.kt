@@ -105,8 +105,8 @@ class JoystickView @JvmOverloads constructor(
 
         invalidate()
 
-        // 計算角度與力度
-        val angle = Math.toDegrees(atan2(dy.toDouble(), dx.toDouble()))
+        // 計算角度與力度 (將 dy 反轉，使向上為正角度/北)
+        val angle = Math.toDegrees(atan2(-dy.toDouble(), dx.toDouble()))
         val strength = min(distance / baseRadius, 1f).toDouble()
         
         listener?.onJoystickMoved(angle, strength)
