@@ -93,7 +93,12 @@ class MainActivity : AppCompatActivity() {
         val mapController = map.controller
         mapController.setZoom(18.0)
         
+        // 必須給予初始座標，否則異步等待真實定位時會因 position 為 null 導致閃退
+        val defaultPoint = GeoPoint(25.0330, 121.5654)
+        mapController.setCenter(defaultPoint)
+        
         userMarker = Marker(map)
+        userMarker.position = defaultPoint
         userMarker.setAnchor(Marker.ANCHOR_CENTER, Marker.ANCHOR_BOTTOM)
         userMarker.title = "目前模擬位置"
         map.overlays.add(userMarker)
