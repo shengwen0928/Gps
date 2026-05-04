@@ -48,10 +48,14 @@ class JoystickView @JvmOverloads constructor(
      * 力度範圍 0.0 到 1.0
      */
     interface JoystickListener {
-        fun onMove(angle: Double, strength: Float)
+        fun onJoystickMoved(angle: Double, strength: Double)
     }
 
-    var listener: JoystickListener? = null
+    private var listener: JoystickListener? = null
+
+    fun setJoystickListener(listener: JoystickListener) {
+        this.listener = listener
+    }
 
     override fun onSizeChanged(w: Int, h: Int, oldw: Int, oldh: Int) {
         super.onSizeChanged(w, h, oldw, oldh)
@@ -103,15 +107,15 @@ class JoystickView @JvmOverloads constructor(
 
         // 計算角度與力度
         val angle = Math.toDegrees(atan2(dy.toDouble(), dx.toDouble()))
-        val strength = min(distance / baseRadius, 1f)
+        val strength = min(distance / baseRadius, 1f).toDouble()
         
-        listener?.onMove(angle, strength)
+        listener?.onJoystickMoved(angle, strength)
     }
 
     private fun resetPosition() {
         hatX = centerX
         hatY = centerY
         invalidate()
-        listener?.onMove(0.0, 0f)
+        listener?.onJoystickMoved(0.0, 0.0)
     }
 }
