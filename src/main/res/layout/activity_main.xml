@@ -20,15 +20,24 @@
         android:padding="16dp"
         android:background="#44000000">
 
-        <!-- 搖桿居中顯示 -->
+        <!-- 搖桿居中顯示 (預設隱藏，改用懸浮搖桿) -->
         <FrameLayout
             android:id="@+id/joystick_container"
             android:layout_width="150dp"
             android:layout_height="150dp"
             android:layout_gravity="center_horizontal"
-            android:layout_marginBottom="16dp">
+            android:layout_marginBottom="16dp"
+            android:visibility="gone">
             <include layout="@layout/layout_joystick" />
         </FrameLayout>
+
+        <Button
+            android:id="@+id/btn_floating_joystick"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginBottom="8dp"
+            android:text="開啟懸浮搖桿"
+            android:alpha="0.8" />
 
         <LinearLayout
             android:layout_width="match_parent"

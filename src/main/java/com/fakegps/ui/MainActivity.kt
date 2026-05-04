@@ -1,12 +1,22 @@
 package com.fakegps.ui
 
+import android.Manifest
+import android.content.Intent
+import android.content.pm.PackageManager
+import android.net.Uri
+import android.os.Build
 import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
+import android.provider.Settings
 import android.widget.Button
 import android.widget.Toast
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
+import androidx.core.content.ContextCompat
 import androidx.preference.PreferenceManager
+import com.google.android.gms.location.LocationServices
+import com.google.android.gms.location.Priority
 import com.fakegps.R
 import com.fakegps.core.MockLocationManager
 import com.fakegps.engine.MovementEngine
@@ -29,6 +39,15 @@ class MainActivity : AppCompatActivity() {
     private val handler = Handler(Looper.getMainLooper())
     private var currentPath = listOf<Pair<Double, Double>>()
     private var currentIndex = 0
+    
+    private val locationPermissionRequest = registerForActivityResult(
+        ActivityResultContracts.RequestMultiplePermissions()
+    ) { permissions ->
+        if (permissions[Manifest.permission.ACCESS_FINE_LOCATION] == true ||
+            permissions[Manifest.permission.ACCESS_COARSE_LOCATION] == true) {
+            initCurrentLocation()
+        }
+    }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -46,12 +65,7 @@ class MainActivity : AppCompatActivity() {
         val mapController = map.controller
         mapController.setZoom(18.0)
         
-        // 初始位置設定在台北 101
-        val startPoint = GeoPoint(25.0330, 121.5654)
-        mapController.setCenter(startPoint)
-
         userMarker = Marker(map)
-        userMarker.position = startPoint
         userMarker.setAnchor(Marker.ANCHOR_CENTER, Marker.ANCHOR_BOTTOM)
         userMarker.title = "目前模擬位置"
         map.overlays.add(userMarker)
@@ -62,31 +76,26 @@ class MainActivity : AppCompatActivity() {
 
         mockLocationManager.setupMockProvider()
 
-        // 搖桿對接
-        val joystick = findViewById<JoystickView>(R.id.joystickView)
-        joystick.setJoystickListener(object : JoystickView.JoystickListener {
-            override fun onJoystickMoved(angle: Double, strength: Double) {
-                if (strength > 0) {
-                    // 將搖桿角度與力度轉換為位移指令
-                    // 力度 0.0-1.0 對應 15-20km/h
-                    val speed = 15.0 + (strength * 5.0)
-                    val rad = Math.toRadians(angle)
-                    val nextLat = userMarker.position.latitude + (Math.cos(rad) * 0.0001)
-                    val nextLng = userMarker.position.longitude + (Math.sin(rad) * 0.0001)
-                    
-                    val jittered = movementEngine.applyGaussianJitter(nextLat, nextLng)
-                    mockLocationManager.setMockLocation(jittered.first, jittered.second, 0.0)
-                    
-                    val newPoint = GeoPoint(jittered.first, jittered.second)
-                    userMarker.position = newPoint
-                    map.invalidate()
-                }
-            }
-        })
+        // 檢查並請求權限
+        if (ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED) {
+            locationPermissionRequest.launch(arrayOf(Manifest.permission.ACCESS_FINE_LOCATION, Manifest.permission.ACCESS_COARSE_LOCATION))
+        } else {
+            initCurrentLocation()
+        }
 
-        // 地圖長按取點
+        // 地圖單擊與長按取點
         val eventsOverlay = org.osmdroid.views.overlay.MapEventsOverlay(object : org.osmdroid.events.MapEventsReceiver {
-            override fun singleTapConfirmedHelper(p: GeoPoint?): Boolean = false
+            override fun singleTapConfirmedHelper(p: GeoPoint?): Boolean {
+                p?.let {
+                    val newPoint = GeoPoint(it.latitude, it.longitude)
+                    userMarker.position = newPoint
+                    mockLocationManager.setMockLocation(it.latitude, it.longitude, 0.0)
+                    map.controller.animateTo(newPoint)
+                    map.invalidate()
+                    Toast.makeText(this@MainActivity, "已瞬移至新位置", Toast.LENGTH_SHORT).show()
+                }
+                return true
+            }
             override fun longPressHelper(p: GeoPoint?): Boolean {
                 p?.let {
                     Toast.makeText(this@MainActivity, "目的地已設定，請點擊[開始行走]", Toast.LENGTH_SHORT).show()
@@ -104,6 +113,25 @@ class MainActivity : AppCompatActivity() {
 
         val btnStart = findViewById<Button>(R.id.btn_start_auto_walk)
         val btnStop = findViewById<Button>(R.id.btn_stop_auto_walk)
+        val btnFloating = findViewById<Button>(R.id.btn_floating_joystick)
+
+        btnFloating.setOnClickListener {
+            if (Settings.canDrawOverlays(this)) {
+                val intent = Intent(this, FloatingJoystickService::class.java)
+                intent.putExtra("LAT", userMarker.position.latitude)
+                intent.putExtra("LNG", userMarker.position.longitude)
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                    startForegroundService(intent)
+                } else {
+                    startService(intent)
+                }
+                Toast.makeText(this, "懸浮搖桿已啟動，您可以退出 App 了", Toast.LENGTH_LONG).show()
+            } else {
+                Toast.makeText(this, "請先允許顯示在其他應用程式上層的權限", Toast.LENGTH_SHORT).show()
+                val intent = Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION, Uri.parse("package:$packageName"))
+                startActivity(intent)
+            }
+        }
 
         btnStart.setOnClickListener {
             if (currentPath.isNotEmpty()) {
@@ -118,21 +146,34 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
+    private fun initCurrentLocation() {
+        val fusedLocationClient = LocationServices.getFusedLocationProviderClient(this)
+        try {
+            fusedLocationClient.lastLocation.addOnSuccessListener { location ->
+                val startPoint = if (location != null) {
+                    GeoPoint(location.latitude, location.longitude)
+                } else {
+                    GeoPoint(25.0330, 121.5654) // 預設台北 101
+                }
+                map.controller.setCenter(startPoint)
+                userMarker.position = startPoint
+                mockLocationManager.setMockLocation(startPoint.latitude, startPoint.longitude, 0.0)
+                map.invalidate()
+            }
+        } catch (e: SecurityException) {
+            // Permission denied
+        }
+    }
+
     private fun startAutoWalk() {
         if (isAutoWalking) return
 
-        val waypoints = listOf(
-            Pair(25.0330, 121.5654),
-            Pair(25.0335, 121.5660),
-            Pair(25.0340, 121.5670),
-            Pair(25.0345, 121.5680),
-            Pair(25.0330, 121.5654) // 返回原點
-        )
+        if (currentPath.isEmpty()) {
+            Toast.makeText(this, "請先在地圖上長按設定目的地", Toast.LENGTH_SHORT).show()
+            return
+        }
 
-        currentPath = routePlanner.planRoute(waypoints, 2.0)
-        currentIndex = 0
         isAutoWalking = true
-
         Toast.makeText(this, "開始自動擬真行走 (15-20km/h)", Toast.LENGTH_SHORT).show()
         autoWalkRunnable.run()
     }
