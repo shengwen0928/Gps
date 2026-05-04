@@ -89,14 +89,13 @@ class MainActivity : AppCompatActivity() {
             override fun singleTapConfirmedHelper(p: GeoPoint?): Boolean = false
             override fun longPressHelper(p: GeoPoint?): Boolean {
                 p?.let {
-                    Toast.makeText(this@MainActivity, "設定目的地: ${it.latitude}, ${it.longitude}", Toast.LENGTH_SHORT).show()
+                    Toast.makeText(this@MainActivity, "目的地已設定，請點擊[開始行走]", Toast.LENGTH_SHORT).show()
                     val waypoints = listOf(
                         Pair(userMarker.position.latitude, userMarker.position.longitude),
                         Pair(it.latitude, it.longitude)
                     )
                     currentPath = routePlanner.planRoute(waypoints, 5.0)
                     currentIndex = 0
-                    startAutoWalk()
                 }
                 return true
             }
@@ -107,7 +106,11 @@ class MainActivity : AppCompatActivity() {
         val btnStop = findViewById<Button>(R.id.btn_stop_auto_walk)
 
         btnStart.setOnClickListener {
-            startAutoWalk()
+            if (currentPath.isNotEmpty()) {
+                startAutoWalk()
+            } else {
+                Toast.makeText(this, "請先在地圖上長按設定目的地", Toast.LENGTH_SHORT).show()
+            }
         }
 
         btnStop.setOnClickListener {

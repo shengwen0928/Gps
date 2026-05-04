@@ -1,50 +1,57 @@
 <?xml version="1.0" encoding="utf-8"?>
-<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="match_parent"
-    android:layout_height="match_parent"
-    android:orientation="vertical">
+    android:layout_height="match_parent">
 
-    <TextView
-        android:id="@+id/text_status"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:padding="16dp"
-        android:text="Fake GPS - 擬真導航模式"
-        android:textSize="18sp"
-        android:textStyle="bold" />
-
+    <!-- 全螢幕地圖 -->
     <org.osmdroid.views.MapView
         android:id="@+id/map"
         android:layout_width="match_parent"
-        android:layout_height="0dp"
-        android:layout_weight="1" />
+        android:layout_height="match_parent" />
 
-    <!-- 搖桿容器 -->
-    <FrameLayout
-        android:id="@+id/joystick_container"
-        android:layout_width="match_parent"
-        android:layout_height="200dp"
-        android:background="#11000000">
-        <include layout="@layout/layout_joystick" />
-    </FrameLayout>
+    <!-- 頂部透明狀態顯示（可選，目前留空以符合用戶要求） -->
 
+    <!-- 下方控制區區塊 -->
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
+        android:layout_gravity="bottom"
         android:orientation="vertical"
-        android:padding="16dp">
+        android:padding="16dp"
+        android:background="#44000000">
 
-        <Button
-            android:id="@+id/btn_start_auto_walk"
+        <!-- 搖桿居中顯示 -->
+        <FrameLayout
+            android:id="@+id/joystick_container"
+            android:layout_width="150dp"
+            android:layout_height="150dp"
+            android:layout_gravity="center_horizontal"
+            android:layout_marginBottom="16dp">
+            <include layout="@layout/layout_joystick" />
+        </FrameLayout>
+
+        <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:text="開始自動行走 (15-20km/h)" />
+            android:orientation="horizontal"
+            android:gap="8dp">
 
-        <Button
-            android:id="@+id/btn_stop_auto_walk"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:text="停止自動行走" />
+            <Button
+                android:id="@+id/btn_start_auto_walk"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:text="開始行走"
+                android:alpha="0.8" />
+
+            <Button
+                android:id="@+id/btn_stop_auto_walk"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:text="停止"
+                android:alpha="0.8" />
+        </LinearLayout>
     </LinearLayout>
 
-</LinearLayout>
+</FrameLayout>
