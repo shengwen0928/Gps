@@ -1,0 +1,31 @@
+<h2>核心功能選擇</h2>
+<p class="subtitle">選擇你希望優先開發的移動方式。建議兩者結合以達到最佳擬真效果。</p>
+
+<div class="options" data-multiselect>
+  <div class="option" data-choice="joystick" onclick="toggleSelect(this)">
+    <div class="letter">A</div>
+    <div class="content">
+      <h3>虛擬搖桿 (Joystick)</h3>
+      <p>在螢幕上顯示浮動搖桿，可手動微調位置與移動方向。適合捕捉特定目標。</p>
+    </div>
+  </div>
+  <div class="option" data-choice="route" onclick="toggleSelect(this)">
+    <div class="letter">B</div>
+    <div class="content">
+      <h3>路徑導航 (Route Navigation)</h3>
+      <p>設定多個路徑點或目的地，App 自動沿著道路行走。適合敷蛋與長時間掛機。</p>
+    </div>
+  </div>
+  <div class="option" data-choice="hybrid" onclick="toggleSelect(this)">
+    <div class="letter">C</div>
+    <div class="content">
+      <h3>混合模式 (推薦)</h3>
+      <p>同時具備搖桿與導航功能，並加入擬真走路演算法（隨機偏移、紅綠燈等待）。</p>
+    </div>
+  </div>
+</div>
+
+<div class="section">
+  <h3>為什麼需要擬真走路演算法？</h3>
+  <p>為了避開遊戲後端大數據的「行為偵測」，我們必須模擬真人的移動規律，包含速度波動、座標抖動與路徑偏差。</p>
+</div>

@@ -1,0 +1,41 @@
+<h2>混合模式細節設計</h2>
+<p class="subtitle">我們正在設計「最高級」的擬真功能。請確認以下細節：</p>
+
+<div class="mockup">
+  <div class="mockup-header">擬真走路演算法 (High-Fidelity)</div>
+  <div class="mockup-body">
+    <ul>
+      <li><strong>速度波動 (Velocity Jitter)</strong>：步行速度會在 4.2 km/h ~ 5.8 km/h 之間隨機震盪，不會一直維持定速。</li>
+      <li><strong>路徑偏移 (Path Deviation)</strong>：角色不會走在完美的道路中線，會隨機產生 0.5 ~ 1.5 公尺的左右偏移（模擬真實行人走路軌跡）。</li>
+      <li><strong>隨機停頓 (Micro-Stops)</strong>：模擬等紅綠燈、看手機或綁鞋帶。在長時間導航中，會隨機停下 5~30 秒。</li>
+      <li><strong>海拔模擬 (Altitude Sync)</strong>：根據地理位置 API 獲取真實地面海拔高度，並加上微量波動。</li>
+    </ul>
+  </div>
+</div>
+
+<div class="section">
+  <h3>導航路徑設定方式</h3>
+  <div class="options" data-multiselect>
+    <div class="option" data-choice="map_tap" onclick="toggleSelect(this)">
+      <div class="letter">A</div>
+      <div class="content">
+        <h3>地圖點選</h3>
+        <p>在地圖上點擊或長按來建立路徑點。</p>
+      </div>
+    </div>
+    <div class="option" data-choice="address_search" onclick="toggleSelect(this)">
+      <div class="letter">B</div>
+      <div class="content">
+        <h3>地址搜尋</h3>
+        <p>輸入具體地點名稱，App 自動導航過去。</p>
+      </div>
+    </div>
+    <div class="option" data-choice="gpx_import" onclick="toggleSelect(this)">
+      <div class="letter">C</div>
+      <div class="content">
+        <h3>匯入路徑 (GPX)</h3>
+        <p>直接匯入預先錄製好的路徑檔案。</p>
+      </div>
+    </div>
+  </div>
+</div>

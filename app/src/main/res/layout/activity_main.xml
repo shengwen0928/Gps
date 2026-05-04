@@ -1,0 +1,42 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:orientation="vertical"
+    android:padding="16dp">
+
+    <TextView
+        android:id="@+id(text_status)"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="Fake GPS - 路徑導航"
+        android:textSize="18sp"
+        android:textStyle="bold" />
+
+    <View
+        android:layout_width="match_parent"
+        android:layout_height="300dp"
+        android:layout_marginTop="16dp"
+        android:background="#CCCCCC" />
+    
+    <TextView
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:gravity="center"
+        android:text="[地圖 SDK 佔位符]"
+        android:textColor="#666666" />
+
+    <Button
+        android:id="@+id/btn_start_auto_walk"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="16dp"
+        android:text="開始自動行走" />
+
+    <Button
+        android:id="@+id/btn_stop_auto_walk"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="停止自動行走" />
+
+</LinearLayout>
