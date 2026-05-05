@@ -162,7 +162,7 @@ class CoreLocationService : LifecycleService() {
                     currentIndex++
                 }
                 
-                delay(1000)
+                delay(500) // 提升至 2Hz，兼顧穩定與性能
             }
             _isAutoWalking.value = false
             if (wakeLock?.isHeld == true) wakeLock?.release()
