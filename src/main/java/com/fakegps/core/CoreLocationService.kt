@@ -12,6 +12,7 @@ import android.os.PowerManager
 import androidx.core.app.NotificationCompat
 import androidx.lifecycle.LifecycleService
 import androidx.lifecycle.lifecycleScope
+import com.fakegps.engine.AltitudeEngine
 import com.fakegps.engine.BehaviorEngine
 import com.fakegps.engine.MovementEngine
 import com.fakegps.map.RoutePlanner
@@ -28,6 +29,7 @@ class CoreLocationService : LifecycleService() {
     private lateinit var movementEngine: MovementEngine
     private lateinit var routePlanner: RoutePlanner
     private lateinit var behaviorEngine: BehaviorEngine
+    private lateinit var altitudeEngine: AltitudeEngine
     private var wakeLock: PowerManager.WakeLock? = null
 
     private val _currentLocation = MutableStateFlow<Pair<Double, Double>>(Pair(25.0330, 121.5654))
@@ -60,6 +62,7 @@ class CoreLocationService : LifecycleService() {
         movementEngine = MovementEngine()
         routePlanner = RoutePlanner(movementEngine)
         behaviorEngine = BehaviorEngine()
+        altitudeEngine = AltitudeEngine()
         
         setupWakeLock()
         _mockProviderStatus.value = mockLocationManager.setupMockProvider()
@@ -177,7 +180,8 @@ class CoreLocationService : LifecycleService() {
      */
     fun updateLocation(lat: Double, lng: Double) {
         val jittered = movementEngine.applyGaussianJitter(lat, lng)
-        mockLocationManager.setMockLocation(jittered.first, jittered.second, 0.0)
+        val altitude = altitudeEngine.calculateCurrentAltitude()
+        mockLocationManager.setMockLocation(jittered.first, jittered.second, altitude)
         _currentLocation.value = jittered
     }
 
