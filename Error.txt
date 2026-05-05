@@ -1,16 +1,32 @@
-build
-Node.js 20 actions are deprecated. The following actions are running on Node.js 20 and may not work as expected: actions/checkout@v4, actions/setup-java@v4, actions/upload-artifact@v4, gradle/gradle-build-action@v2. Actions will be forced to run with Node.js 24 by default starting June 2nd, 2026. Node.js 20 will be removed from the runner on September 16th, 2026. Please check if updated versions of these actions are available that support Node.js 24. To opt into Node.js 24 now, set the FORCE_JAVASCRIPT_ACTIONS_TO_NODE24=true environment variable on the runner or in your workflow file. Once Node.js 24 becomes the default, you can temporarily opt out by setting ACTIONS_ALLOW_USE_UNSECURE_NODE_VERSION=true. For more information see: https://github.blog/changelog/2025-09-19-deprecation-of-node-20-on-github-actions-runners/
-build
-Failed to save cache entry with path '/home/runner/.gradle/caches,/home/runner/.gradle/notifications,/home/runner/.gradle/.gradle-build-action,zstd-without-long,1.0' and key: v8-gradle|Linux|android ci (build apk)-build[37a6259cc0c1dae299a7866489dff0bd]-b6cc1c7f34b91d5fa884c5bb350584b2424f166e: Error: <h2>Our services aren't available right now</h2><p>We're working to restore all services as soon as possible. Please check back soon.</p>0sn35aQAAAAA8kR9nxwYkQqxSIJnavtWcQ0hJMzBFREdFMDExMwBFZGdl
-build
-Failed to save cache entry with path '/home/runner/.gradle/caches/jars-*/*,zstd-without-long,1.0' and key: instrumented-jars-d9c7a3f4351f0ecfe0ca95dc33cd63f3: Error: <h2>Our services aren't available right now</h2><p>We're working to restore all services as soon as possible. Please check back soon.</p>0sn35aQAAAAAZfvPwysNWSIKhIggwsHgHQ0hJMzBFREdFMDExMwBFZGdl
-build
-Failed to save cache entry with path '/home/runner/.gradle/caches/modules-*/files-*/*/*/*/*,zstd-without-long,1.0' and key: dependencies-67824e082224892ce0d34c0ddfd70f9a: Error: <h2>Our services aren't available right now</h2><p>We're working to restore all services as soon as possible. Please check back soon.</p>0sn35aQAAAAB7XR6+Xd81RoWL52WJNHFgQ0hJMzBFREdFMDExMwBFZGdl
-build
-Failed to save cache entry with path '/home/runner/.gradle/wrapper/dists/gradle-8.1.1-bin/9wiye5v2saajue4irfo8ybqfp,zstd-without-long,1.0' and key: wrapper-zips-afd0375446f1253bae891db7b1ab4e7b: Error: <h2>Our services aren't available right now</h2><p>We're working to restore all services as soon as possible. Please check back soon.</p>0sH35aQAAAABe5oRiTYPxQKjlpoXGeBnEQ0hJMzBFREdFMDExMwBFZGdl
-build
-Save Gradle distribution 8.1.1 failed: Error: <h2>Our services aren't available right now</h2><p>We're working to restore all services as soon as possible. Please check back soon.</p>0P335aQAAAAAurBSsyeBbTIi9wrrIFXGkQ0hJMzBFREdFMDIxMwBFZGdl
-build
-Restore Gradle distribution 8.1.1 failed: Error: Cache service responded with 400
-build
-Failed to restore v8-gradle|Linux|android ci (build apk)-build[37a6259cc0c1dae299a7866489dff0bd]-b6cc1c7f34b91d5fa884c5bb350584b2424f166e: Error: Cache service responded with 400
+Run gradle wrapper
+
+Welcome to Gradle 8.1.1!
+
+Here are the highlights of this release:
+ - Stable configuration cache
+ - Experimental Kotlin DSL assignment syntax
+ - Building with Java 20
+
+For more details see https://docs.gradle.org/8.1.1/release-notes.html
+
+Starting a Gradle Daemon (subsequent builds will be faster)
+
+FAILURE: Build failed with an exception.
+
+* Where:
+Build file '/home/runner/work/Gps/Gps/build.gradle' line: 20
+
+* What went wrong:
+A problem occurred evaluating root project 'FakeGPS'.
+> Failed to apply plugin 'com.android.internal.version-check'.
+   > Minimum supported Gradle version is 8.6. Current version is 8.1.1. If using the gradle wrapper, try editing the distributionUrl in /home/runner/work/Gps/Gps/gradle/wrapper/gradle-wrapper.properties to gradle-8.6-all.zip
+
+* Try:
+> Run with --stacktrace option to get the stack trace.
+> Run with --info or --debug option to get more log output.
+> Run with --scan to get full insights.
+
+* Get more help at https://help.gradle.org
+
+BUILD FAILED in 32s
+Error: Process completed with exit code 1.
