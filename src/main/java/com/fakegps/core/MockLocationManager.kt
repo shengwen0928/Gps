@@ -19,16 +19,25 @@ class MockLocationManager(private val context: Context) {
      */
     fun setupMockProvider() {
         try {
+            // 如果已存在則先移除，避免重複添加崩潰
+            if (locationManager.allProviders.contains(providerName)) {
+                try {
+                    locationManager.removeTestProvider(providerName)
+                } catch (e: Exception) {
+                    e.printStackTrace()
+                }
+            }
+            
             // 參數說明：提供者名稱, 是否支援高度, 是否支援速度, 是否支援方位, 是否有成本, 支援電池電力, 支援高度, 支援速度, 功率需求, 精準度
             locationManager.addTestProvider(
                 providerName,
-                false, false, false, false,
+                true, true, true, false,
                 true, true, true,
-                0, 5
+                0, 1
             )
             locationManager.setTestProviderEnabled(providerName, true)
         } catch (e: SecurityException) {
-            // 處理權限不足（未在開發者選項中設定為模擬位置 App）
+            // 未在開發者選項中設定為模擬位置 App
             e.printStackTrace()
         } catch (e: Exception) {
             e.printStackTrace()
