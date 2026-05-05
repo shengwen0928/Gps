@@ -64,8 +64,12 @@ class CoreLocationService : LifecycleService() {
     }
 
     private fun setupWakeLock() {
-        val powerManager = getSystemService(Context.POWER_SERVICE) as PowerManager
-        wakeLock = powerManager.newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, "FakeGPS::MovementLock")
+        try {
+            val powerManager = getSystemService(Context.POWER_SERVICE) as PowerManager
+            wakeLock = powerManager.newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, "FakeGPS::MovementLock")
+        } catch (e: Exception) {
+            e.printStackTrace()
+        }
     }
 
     private fun startForegroundService() {
@@ -100,8 +104,14 @@ class CoreLocationService : LifecycleService() {
         currentIndex = 0
         _isAutoWalking.value = true
         
-        // 獲取 WakeLock，防止 CPU 在螢幕關閉時休眠
-        wakeLock?.acquire(2 * 60 * 60 * 1000L /* 2 hours max */)
+        // 安全獲取 WakeLock，防止因重複 acquire 或權限缺失導致崩潰
+        try {
+            if (wakeLock?.isHeld == false) {
+                wakeLock?.acquire(2 * 60 * 60 * 1000L /* 2 hours max */)
+            }
+        } catch (e: Exception) {
+            e.printStackTrace()
+        }
         
         autoWalkJob?.cancel()
         autoWalkJob = lifecycleScope.launch {
