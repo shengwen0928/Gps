@@ -74,14 +74,13 @@ class MockLocationManager(private val context: Context) {
      * @param alt 高度
      * @param speed 速度 (m/s)
      * @param bearing 方位角 (0-360)
+     * @param satellites 衛星數量 (動態模擬)
      */
-    fun setMockLocation(lat: Double, lng: Double, alt: Double, speed: Float = 0.0f, bearing: Float = 0.0f) {
+    fun setMockLocation(lat: Double, lng: Double, alt: Double, speed: Float = 0.0f, bearing: Float = 0.0f, satellites: Int = 12) {
         val currentTime = System.currentTimeMillis()
         val elapsedNanos = SystemClock.elapsedRealtimeNanos()
 
         for (provider in providers) {
-            updateProviderStatus(provider)
-
             val mockLocation = Location(provider).apply {
                 latitude = lat
                 longitude = lng
@@ -99,13 +98,13 @@ class MockLocationManager(private val context: Context) {
                     bearingAccuracyDegrees = 0.1f
                 }
                 val bundle = android.os.Bundle()
-                bundle.putInt("satellites", 12) // 模擬強訊號
+                bundle.putInt("satellites", satellites) // 動態注入衛星數
                 extras = bundle
             }
             try {
                 locationManager.setTestProviderLocation(provider, mockLocation)
             } catch (e: Exception) {
-                // 部分系統不支持 fused 的寫入
+                // 部分系統不支持 fused/network 的寫入，靜默處理
             }
         }
     }

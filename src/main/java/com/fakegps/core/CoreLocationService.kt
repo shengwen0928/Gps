@@ -121,48 +121,48 @@ class CoreLocationService : LifecycleService() {
         
         autoWalkJob?.cancel()
         autoWalkJob = lifecycleScope.launch {
-            var lastLat = _currentLocation.value.first
-            var lastLng = _currentLocation.value.second
+            var logicalLat = _currentLocation.value.first
+            var logicalLng = _currentLocation.value.second
             var startTime = System.currentTimeMillis()
 
             while (isActive && currentIndex < currentPath.size) {
                 // 1. 檢查隨機停頓 (Micro-Stops)
                 behaviorEngine.shouldTriggerMicroStop()?.let { stopSeconds ->
                     delay(stopSeconds * 1000L)
-                    startTime = System.currentTimeMillis() // 恢復後重置加速時間
+                    startTime = System.currentTimeMillis()
                 }
 
                 val target = currentPath[currentIndex]
                 
-                // 2. 計算擬真速度 (Easing + Fluctuation)
+                // 2. 計算物理特徵 (S型曲線 + 隨機衛星鎖定)
                 val elapsedSeconds = (System.currentTimeMillis() - startTime) / 1000.0
                 val baseSpeed = behaviorEngine.calculateEasingSpeed(18.0, elapsedSeconds)
                 val currentSpeed = behaviorEngine.generateSpeedFluctuation(baseSpeed)
+                val satellites = behaviorEngine.calculateSatellites(elapsedSeconds)
                 
-                // 3. 執行位移運算
+                // 3. 執行純淨位移運算 (基於 200ms 步長)
                 val nextLoc = movementEngine.calculateNextLocation(
-                    lastLat, lastLng,
+                    logicalLat, logicalLng,
                     target.first, target.second,
-                    currentSpeed, 1000
+                    currentSpeed, 200
                 )
 
-                // 計算方位角
-                val bearing = movementEngine.calculateBearing(lastLat, lastLng, nextLoc.first, nextLoc.second)
-                // 轉換速度為 m/s (系統要求)
+                val bearing = movementEngine.calculateBearing(logicalLat, logicalLng, nextLoc.first, nextLoc.second)
                 val speedMs = (currentSpeed / 3.6).toFloat()
 
-                val jitteredLoc = movementEngine.applyGaussianJitter(nextLoc.first, nextLoc.second)
-                updateLocationFull(jitteredLoc.first, jitteredLoc.second, speedMs, bearing)
-                
-                lastLat = jitteredLoc.first
-                lastLng = jitteredLoc.second
+                // 更新邏輯座標（不含抖動）供下一次循環
+                logicalLat = nextLoc.first
+                logicalLng = nextLoc.second
 
-                val distToTarget = movementEngine.calculateDistance(lastLat, lastLng, target.first, target.second)
+                // 4. 輸出至系統（套用微量抖動與動態衛星數）
+                updateLocationFull(logicalLat, logicalLng, speedMs, bearing, satellites)
+
+                val distToTarget = movementEngine.calculateDistance(logicalLat, logicalLng, target.first, target.second)
                 if (distToTarget < 1.0) {
                     currentIndex++
                 }
                 
-                delay(500) // 提升至 2Hz，兼顧穩定與性能
+                delay(200) // 5Hz 高頻鎖定
             }
             _isAutoWalking.value = false
             if (wakeLock?.isHeld == true) wakeLock?.release()
@@ -184,17 +184,22 @@ class CoreLocationService : LifecycleService() {
      * 手動設定座標
      */
     fun updateLocation(lat: Double, lng: Double) {
-        updateLocationFull(lat, lng, 0.0f, 0.0f)
+        updateLocationFull(lat, lng, 0.0f, 0.0f, 12)
     }
 
     /**
-     * 更新完整座標特徵
+     * 更新完整座標特徵 (系統層級輸出)
      */
-    private fun updateLocationFull(lat: Double, lng: Double, speed: Float, bearing: Float) {
-        val jittered = movementEngine.applyGaussianJitter(lat, lng)
+    private fun updateLocationFull(lat: Double, lng: Double, speed: Float, bearing: Float, satellites: Int) {
+        // 使用 BehaviorEngine 的微量化抖動 (0.1m-0.3m)，防止超速感
+        val jitter = behaviorEngine.calculateMicroJitterOffset(lat)
+        val finalLat = lat + jitter.first
+        val finalLng = lng + jitter.second
+        
         val altitude = altitudeEngine.calculateCurrentAltitude()
-        mockLocationManager.setMockLocation(jittered.first, jittered.second, altitude, speed, bearing)
-        _currentLocation.value = jittered
+        
+        mockLocationManager.setMockLocation(finalLat, finalLng, altitude, speed, bearing, satellites)
+        _currentLocation.value = Pair(finalLat, finalLng)
     }
 
     override fun onDestroy() {
