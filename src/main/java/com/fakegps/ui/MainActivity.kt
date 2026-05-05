@@ -35,7 +35,7 @@ import org.osmdroid.views.overlay.Marker
 
 /**
  * MainActivity: 負責 UI 顯示與地圖互動
- * 已重構為觀察者模式，邏輯移至 CoreLocationService 與 MainViewModel
+ * 已實作「權限守門員」機制：必須全數授權後才載入主邏輯。
  */
 class MainActivity : AppCompatActivity() {
 
@@ -48,7 +48,9 @@ class MainActivity : AppCompatActivity() {
     private val backgroundLocationPermissionRequest = registerForActivityResult(
         ActivityResultContracts.RequestPermission()
     ) { isGranted ->
-        if (!isGranted) {
+        if (isGranted) {
+            checkAndRequestFullPermissions()
+        } else {
             Toast.makeText(this, "需要「一律允許」定位才能在背景穩定執行", Toast.LENGTH_LONG).show()
         }
     }
@@ -59,10 +61,9 @@ class MainActivity : AppCompatActivity() {
         val granted = permissions[Manifest.permission.ACCESS_FINE_LOCATION] == true ||
                       permissions[Manifest.permission.ACCESS_COARSE_LOCATION] == true
         if (granted) {
-            initCurrentLocation()
-            requestBackgroundLocationPermission()
+            checkAndRequestFullPermissions()
         } else {
-            Toast.makeText(this, "需要定位權限才能獲取目前位置", Toast.LENGTH_LONG).show()
+            Toast.makeText(this, "需要定位權限才能啟動應用", Toast.LENGTH_LONG).show()
         }
     }
 
@@ -87,14 +88,36 @@ class MainActivity : AppCompatActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        // 進入 App 即啟動權限檢查鏈
+        checkAndRequestFullPermissions()
+    }
+
+    private fun checkAndRequestFullPermissions() {
+        val hasFineLocation = ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED
+        val hasBackgroundLocation = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_BACKGROUND_LOCATION) == PackageManager.PERMISSION_GRANTED
+        } else true
         
+        val pm = getSystemService(POWER_SERVICE) as android.os.PowerManager
+        val isIgnoringBattery = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+            pm.isIgnoringBatteryOptimizations(packageName)
+        } else true
+
+        if (hasFineLocation && hasBackgroundLocation && isIgnoringBattery) {
+            if (!::map.isInitialized) {
+                initAppLogic()
+            }
+        } else {
+            requestPermissions()
+        }
+    }
+
+    private fun initAppLogic() {
         try {
-            // 設置沉浸式狀態欄
             WindowCompat.setDecorFitsSystemWindows(window, false)
             window.statusBarColor = Color.TRANSPARENT
             window.navigationBarColor = Color.TRANSPARENT
             
-            // OSMDroid 初始化
             val ctx = applicationContext
             Configuration.getInstance().userAgentValue = packageName
             Configuration.getInstance().load(ctx, PreferenceManager.getDefaultSharedPreferences(ctx))
@@ -104,9 +127,7 @@ class MainActivity : AppCompatActivity() {
             setupFullscreen()
             setupMap()
             setupObservers()
-            requestPermissions()
 
-            // 啟動並綁定核心服務
             val serviceIntent = Intent(this, CoreLocationService::class.java)
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
                 startForegroundService(serviceIntent)
@@ -115,7 +136,6 @@ class MainActivity : AppCompatActivity() {
             }
             bindService(serviceIntent, viewModel.serviceConnection, BIND_AUTO_CREATE)
 
-            // 搖桿對接
             val joystick = findViewById<JoystickView>(R.id.joystickView)
             joystick.setJoystickListener(object : JoystickView.JoystickListener {
                 override fun onJoystickMoved(angle: Double, strength: Double) {
@@ -128,7 +148,6 @@ class MainActivity : AppCompatActivity() {
                 }
             })
 
-            // 地圖點擊事件
             val eventsOverlay = org.osmdroid.views.overlay.MapEventsOverlay(object : org.osmdroid.events.MapEventsReceiver {
                 override fun singleTapConfirmedHelper(p: GeoPoint?): Boolean {
                     p?.let {
@@ -165,9 +184,10 @@ class MainActivity : AppCompatActivity() {
             findViewById<Button>(R.id.btn_stop_auto_walk).setOnClickListener {
                 viewModel.stopAutoWalk()
             }
+            
+            initCurrentLocation()
         } catch (e: Exception) {
             e.printStackTrace()
-            Toast.makeText(this, "發生未知錯誤，請重啟應用", Toast.LENGTH_LONG).show()
         }
     }
 
@@ -274,10 +294,28 @@ class MainActivity : AppCompatActivity() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
             permissions.add(Manifest.permission.POST_NOTIFICATIONS)
         }
-        locationPermissionRequest.launch(permissions.toTypedArray())
+        
+        val hasFineLocation = ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED
+        if (!hasFineLocation) {
+            locationPermissionRequest.launch(permissions.toTypedArray())
+            return
+        }
 
-        // 請求忽略電池優化
-        requestIgnoreBatteryOptimizations()
+        val hasBackgroundLocation = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_BACKGROUND_LOCATION) == PackageManager.PERMISSION_GRANTED
+        } else true
+        if (!hasBackgroundLocation) {
+            requestBackgroundLocationPermission()
+            return
+        }
+
+        val pm = getSystemService(POWER_SERVICE) as android.os.PowerManager
+        val isIgnoringBattery = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+            pm.isIgnoringBatteryOptimizations(packageName)
+        } else true
+        if (!isIgnoringBattery) {
+            requestIgnoreBatteryOptimizations()
+        }
     }
 
     private fun requestIgnoreBatteryOptimizations() {
@@ -316,16 +354,19 @@ class MainActivity : AppCompatActivity() {
 
     override fun onResume() {
         super.onResume()
-        map.onResume()
+        if (::map.isInitialized) map.onResume()
+        checkAndRequestFullPermissions()
     }
 
     override fun onPause() {
         super.onPause()
-        map.onPause()
+        if (::map.isInitialized) map.onPause()
     }
 
     override fun onDestroy() {
-        unbindService(viewModel.serviceConnection)
+        if (::map.isInitialized) {
+            try { unbindService(viewModel.serviceConnection) } catch(e: Exception) {}
+        }
         super.onDestroy()
     }
 }

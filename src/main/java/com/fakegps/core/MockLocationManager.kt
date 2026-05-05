@@ -70,16 +70,17 @@ class MockLocationManager(private val context: Context) {
         }
     }
 
+    private var lastStatusUpdateTime = 0L
+
     /**
      * 設定模擬位置
      */
     fun setMockLocation(lat: Double, lng: Double, alt: Double, speed: Float = 0.0f, bearing: Float = 0.0f, satellites: Int = 12) {
         val currentTime = System.currentTimeMillis()
-        // 關鍵：將納秒時間戳提前一個固定的小量 (10ms)，確保在系統 Fused 引擎仲裁中始終佔優
+        // 修正：維持 10ms 的微量領先，這是贏過系統仲裁的黃金值
         val elapsedNanos = SystemClock.elapsedRealtimeNanos() + 10_000_000L
 
         for (provider in providers) {
-            // 自動修復失效的 Provider
             if (!locationManager.isProviderEnabled(provider)) {
                 try { locationManager.setTestProviderEnabled(provider, true) } catch (e: Exception) {}
             }
@@ -91,7 +92,7 @@ class MockLocationManager(private val context: Context) {
                 this.speed = speed
                 this.bearing = bearing
                 time = currentTime
-                accuracy = 0.5f // 強力壓制真實訊號
+                accuracy = 0.5f 
                 
                 if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.JELLY_BEAN_MR1) {
                     elapsedRealtimeNanos = elapsedNanos
@@ -107,7 +108,6 @@ class MockLocationManager(private val context: Context) {
                 bundle.putInt("satellites", satellites)
                 bundle.putBoolean("mockLocation", false)
                 
-                // 注入 NMEA
                 val gpgga = nmeaEngine.generateGpgga(lat, lng, alt, satellites, currentTime)
                 val gprmc = nmeaEngine.generateGprmc(lat, lng, speed, bearing, currentTime)
                 bundle.putString("nmea_gpgga", gpgga)
@@ -118,10 +118,13 @@ class MockLocationManager(private val context: Context) {
             }
             try {
                 locationManager.setTestProviderLocation(provider, mockLocation)
-                // 寫入後立即發送狀態心跳，強迫系統重新採納
-                locationManager.setTestProviderStatus(provider, android.location.LocationProvider.AVAILABLE, null, currentTime)
+                
+                // 修復：狀態更新頻率限制在 1Hz，過度頻繁的狀態心跳會被 Fused 引擎視為不穩定而過濾
+                if (currentTime - lastStatusUpdateTime > 1000) {
+                    locationManager.setTestProviderStatus(provider, android.location.LocationProvider.AVAILABLE, null, currentTime)
+                    lastStatusUpdateTime = currentTime
+                }
             } catch (e: Exception) {
-                // 靜默處理
             }
         }
     }
