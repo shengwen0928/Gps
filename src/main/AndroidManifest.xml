@@ -9,6 +9,7 @@
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
 
     <application
         android:allowBackup="true"
@@ -26,10 +27,15 @@
         </activity>
 
         <service
-            android:name=".ui.FloatingJoystickService"
+            android:name=".core.CoreLocationService"
             android:enabled="true"
             android:exported="false"
             android:foregroundServiceType="location" />
+
+        <service
+            android:name=".ui.FloatingJoystickService"
+            android:enabled="true"
+            android:exported="false" />
 
     </application>
 

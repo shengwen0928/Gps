@@ -4,7 +4,6 @@ import android.app.Notification
 import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.app.Service
-import android.content.Context
 import android.content.Intent
 import android.graphics.PixelFormat
 import android.os.Build
@@ -14,19 +13,19 @@ import android.view.LayoutInflater
 import android.view.MotionEvent
 import android.view.View
 import android.view.WindowManager
+import android.widget.Button
 import androidx.core.app.NotificationCompat
 import com.fakegps.R
-import com.fakegps.core.MockLocationManager
-import com.fakegps.engine.MovementEngine
+import com.fakegps.core.CoreLocationService
 
+/**
+ * 懸浮搖桿服務：僅負責顯示搖桿 UI 並將指令傳遞給 CoreLocationService
+ */
 class FloatingJoystickService : Service() {
 
     private lateinit var windowManager: WindowManager
     private lateinit var floatingView: View
-    private lateinit var mockLocationManager: MockLocationManager
-    private lateinit var movementEngine: MovementEngine
     
-    // 儲存當前位置，這裡先預設一個，實際應用可由 Intent 傳入
     private var currentLat = 25.0330
     private var currentLng = 121.5654
 
@@ -34,26 +33,31 @@ class FloatingJoystickService : Service() {
 
     override fun onCreate() {
         super.onCreate()
-        
+        setupNotification()
+        setupFloatingWindow()
+    }
+
+    private fun setupNotification() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            val channel = NotificationChannel("fakegps_channel", "Fake GPS Service", NotificationManager.IMPORTANCE_LOW)
+            val channelId = "floating_joystick_channel"
+            val channel = NotificationChannel(channelId, "Floating Joystick", NotificationManager.IMPORTANCE_LOW)
             val manager = getSystemService(NotificationManager::class.java)
             manager.createNotificationChannel(channel)
             
-            val notification: Notification = NotificationCompat.Builder(this, "fakegps_channel")
+            val notification: Notification = NotificationCompat.Builder(this, channelId)
                 .setContentTitle("Fake GPS 懸浮搖桿")
-                .setContentText("正在背景運行中...")
+                .setContentText("搖桿運行中，拖動可改變位置")
                 .setSmallIcon(android.R.drawable.ic_menu_mylocation)
                 .build()
                 
-            startForeground(1, notification)
+            startForeground(2, notification)
         }
+    }
 
-        mockLocationManager = MockLocationManager(this)
-        mockLocationManager.setupMockProvider()
-        movementEngine = MovementEngine()
-
+    private fun setupFloatingWindow() {
         windowManager = getSystemService(WINDOW_SERVICE) as WindowManager
+        floatingView = LayoutInflater.from(this).inflate(R.layout.layout_floating_joystick, null)
+
         val layoutParams = WindowManager.LayoutParams(
             WindowManager.LayoutParams.WRAP_CONTENT,
             WindowManager.LayoutParams.WRAP_CONTENT,
@@ -66,27 +70,19 @@ class FloatingJoystickService : Service() {
         layoutParams.x = 100
         layoutParams.y = 100
 
-        floatingView = LayoutInflater.from(this).inflate(R.layout.layout_floating_joystick, null)
-
         val joystick = floatingView.findViewById<JoystickView>(R.id.floatingJoystickView)
-        val btnClose = floatingView.findViewById<View>(R.id.btn_close_joystick)
-
         joystick.setJoystickListener(object : JoystickView.JoystickListener {
             override fun onJoystickMoved(angle: Double, strength: Double) {
                 if (strength > 0) {
                     val rad = Math.toRadians(angle)
-                    // 力度 0.0-1.0 對應位移量
-                    // 修正：0度為東(cos), 90度為北(sin)
                     currentLat += (Math.sin(rad) * 0.0001)
                     currentLng += (Math.cos(rad) * 0.0001)
-                    
-                    val jittered = movementEngine.applyGaussianJitter(currentLat, currentLng)
-                    mockLocationManager.setMockLocation(jittered.first, jittered.second, 0.0)
+                    sendCommandToCore(currentLat, currentLng)
                 }
             }
         })
 
-        btnClose.setOnClickListener {
+        floatingView.findViewById<Button>(R.id.btn_close_joystick).setOnClickListener {
             stopSelf()
         }
 
@@ -120,10 +116,19 @@ class FloatingJoystickService : Service() {
         windowManager.addView(floatingView, layoutParams)
     }
 
+    private fun sendCommandToCore(lat: Double, lng: Double) {
+        val intent = Intent(this, CoreLocationService::class.java).apply {
+            action = "UPDATE_LOCATION"
+            putExtra("LAT", lat)
+            putExtra("LNG", lng)
+        }
+        startService(intent)
+    }
+
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         intent?.let {
-            currentLat = it.getDoubleExtra("LAT", 25.0330)
-            currentLng = it.getDoubleExtra("LNG", 121.5654)
+            currentLat = it.getDoubleExtra("LAT", currentLat)
+            currentLng = it.getDoubleExtra("LNG", currentLng)
         }
         return START_NOT_STICKY
     }
@@ -133,6 +138,5 @@ class FloatingJoystickService : Service() {
         if (::floatingView.isInitialized) {
             windowManager.removeView(floatingView)
         }
-        mockLocationManager.removeMockProvider()
     }
 }
