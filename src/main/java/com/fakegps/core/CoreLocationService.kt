@@ -12,6 +12,7 @@ import android.os.PowerManager
 import androidx.core.app.NotificationCompat
 import androidx.lifecycle.LifecycleService
 import androidx.lifecycle.lifecycleScope
+import com.fakegps.engine.BehaviorEngine
 import com.fakegps.engine.MovementEngine
 import com.fakegps.map.RoutePlanner
 import kotlinx.coroutines.*
@@ -26,6 +27,7 @@ class CoreLocationService : LifecycleService() {
     private lateinit var mockLocationManager: MockLocationManager
     private lateinit var movementEngine: MovementEngine
     private lateinit var routePlanner: RoutePlanner
+    private lateinit var behaviorEngine: BehaviorEngine
     private var wakeLock: PowerManager.WakeLock? = null
 
     private val _currentLocation = MutableStateFlow<Pair<Double, Double>>(Pair(25.0330, 121.5654))
@@ -57,6 +59,7 @@ class CoreLocationService : LifecycleService() {
         mockLocationManager = MockLocationManager(this)
         movementEngine = MovementEngine()
         routePlanner = RoutePlanner(movementEngine)
+        behaviorEngine = BehaviorEngine()
         
         setupWakeLock()
         _mockProviderStatus.value = mockLocationManager.setupMockProvider()
@@ -104,7 +107,7 @@ class CoreLocationService : LifecycleService() {
         currentIndex = 0
         _isAutoWalking.value = true
         
-        // 安全獲取 WakeLock，防止因重複 acquire 或權限缺失導致崩潰
+        // 安全獲取 WakeLock
         try {
             if (wakeLock?.isHeld == false) {
                 wakeLock?.acquire(2 * 60 * 60 * 1000L /* 2 hours max */)
@@ -117,14 +120,27 @@ class CoreLocationService : LifecycleService() {
         autoWalkJob = lifecycleScope.launch {
             var lastLat = _currentLocation.value.first
             var lastLng = _currentLocation.value.second
+            var startTime = System.currentTimeMillis()
 
             while (isActive && currentIndex < currentPath.size) {
+                // 1. 檢查隨機停頓 (Micro-Stops)
+                behaviorEngine.shouldTriggerMicroStop()?.let { stopSeconds ->
+                    delay(stopSeconds * 1000L)
+                    startTime = System.currentTimeMillis() // 恢復後重置加速時間
+                }
+
                 val target = currentPath[currentIndex]
                 
+                // 2. 計算擬真速度 (Easing + Fluctuation)
+                val elapsedSeconds = (System.currentTimeMillis() - startTime) / 1000.0
+                val baseSpeed = behaviorEngine.calculateEasingSpeed(18.0, elapsedSeconds)
+                val currentSpeed = behaviorEngine.generateSpeedFluctuation(baseSpeed)
+                
+                // 3. 執行位移運算
                 val nextLoc = movementEngine.calculateNextLocation(
                     lastLat, lastLng,
                     target.first, target.second,
-                    18.0, 1000
+                    currentSpeed, 1000
                 )
 
                 val jitteredLoc = movementEngine.applyGaussianJitter(nextLoc.first, nextLoc.second)
