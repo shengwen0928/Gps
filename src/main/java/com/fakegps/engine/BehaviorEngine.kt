@@ -42,6 +42,18 @@ class BehaviorEngine {
     }
 
     /**
+     * 判定是否應觸發隨機停頓 (Micro-Stops)
+     * 模擬等紅綠燈或查看手機的情境
+     */
+    fun shouldTriggerMicroStop(): Int? {
+        // 每步有 0.5% 的機率停頓 (5Hz 下較合理)
+        if (random.nextDouble() < 0.005) {
+            return 5 + random.nextInt(26)
+        }
+        return null
+    }
+
+    /**
      * 產生微量化平滑偏移 (0.1m ~ 0.3m)
      * 適用於 5Hz 高頻模式
      */
