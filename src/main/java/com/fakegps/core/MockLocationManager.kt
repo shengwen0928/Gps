@@ -75,7 +75,8 @@ class MockLocationManager(private val context: Context) {
      */
     fun setMockLocation(lat: Double, lng: Double, alt: Double, speed: Float = 0.0f, bearing: Float = 0.0f, satellites: Int = 12) {
         val currentTime = System.currentTimeMillis()
-        val elapsedNanos = SystemClock.elapsedRealtimeNanos()
+        // 關鍵：將納秒時間戳提前一個固定的小量 (10ms)，確保在系統 Fused 引擎仲裁中始終佔優
+        val elapsedNanos = SystemClock.elapsedRealtimeNanos() + 10_000_000L
 
         for (provider in providers) {
             // 自動修復失效的 Provider
@@ -90,7 +91,7 @@ class MockLocationManager(private val context: Context) {
                 this.speed = speed
                 this.bearing = bearing
                 time = currentTime
-                accuracy = 0.5f // 最高等級精確度
+                accuracy = 0.5f // 強力壓制真實訊號
                 
                 if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.JELLY_BEAN_MR1) {
                     elapsedRealtimeNanos = elapsedNanos
@@ -102,12 +103,11 @@ class MockLocationManager(private val context: Context) {
                     bearingAccuracyDegrees = 0.1f
                 }
                 
-                // 模擬真實的衛星分布 Metadata 與 NMEA 原始語句
                 val bundle = android.os.Bundle()
                 bundle.putInt("satellites", satellites)
-                bundle.putBoolean("mockLocation", false) // 某些 App 會檢查這個隱藏欄位，我們將其設為 false 以欺騙檢測
+                bundle.putBoolean("mockLocation", false)
                 
-                // 注入虛擬硬體級 NMEA 流
+                // 注入 NMEA
                 val gpgga = nmeaEngine.generateGpgga(lat, lng, alt, satellites, currentTime)
                 val gprmc = nmeaEngine.generateGprmc(lat, lng, speed, bearing, currentTime)
                 bundle.putString("nmea_gpgga", gpgga)
@@ -118,6 +118,8 @@ class MockLocationManager(private val context: Context) {
             }
             try {
                 locationManager.setTestProviderLocation(provider, mockLocation)
+                // 寫入後立即發送狀態心跳，強迫系統重新採納
+                locationManager.setTestProviderStatus(provider, android.location.LocationProvider.AVAILABLE, null, currentTime)
             } catch (e: Exception) {
                 // 靜默處理
             }

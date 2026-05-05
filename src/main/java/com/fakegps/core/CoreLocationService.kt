@@ -65,8 +65,13 @@ class CoreLocationService : LifecycleService() {
         altitudeEngine = AltitudeEngine()
         
         setupWakeLock()
-        _mockProviderStatus.value = mockLocationManager.setupMockProvider()
         startForegroundService()
+        
+        // 延遲 500ms 進行 Mock Provider 初始化，防止啟動時 Binder 競爭導致當機
+        lifecycleScope.launch {
+            delay(500)
+            _mockProviderStatus.value = mockLocationManager.setupMockProvider()
+        }
     }
 
     private fun setupWakeLock() {
