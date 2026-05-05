@@ -3,10 +3,12 @@ package com.fakegps.core
 import android.app.Notification
 import android.app.NotificationChannel
 import android.app.NotificationManager
+import android.content.Context
 import android.content.Intent
 import android.os.Binder
 import android.os.Build
 import android.os.IBinder
+import android.os.PowerManager
 import androidx.core.app.NotificationCompat
 import androidx.lifecycle.LifecycleService
 import androidx.lifecycle.lifecycleScope
@@ -18,13 +20,13 @@ import kotlinx.coroutines.flow.asStateFlow
 
 /**
  * 核心位置服務：負責管理所有的模擬位置邏輯、擬真引擎運算以及背景執行。
- * 解決了原本 MainActivity 與 FloatingJoystickService 重複初始化引擎的問題。
  */
 class CoreLocationService : LifecycleService() {
 
     private lateinit var mockLocationManager: MockLocationManager
     private lateinit var movementEngine: MovementEngine
     private lateinit var routePlanner: RoutePlanner
+    private var wakeLock: PowerManager.WakeLock? = null
 
     private val _currentLocation = MutableStateFlow<Pair<Double, Double>>(Pair(25.0330, 121.5654))
     val currentLocation = _currentLocation.asStateFlow()
@@ -56,8 +58,14 @@ class CoreLocationService : LifecycleService() {
         movementEngine = MovementEngine()
         routePlanner = RoutePlanner(movementEngine)
         
+        setupWakeLock()
         _mockProviderStatus.value = mockLocationManager.setupMockProvider()
         startForegroundService()
+    }
+
+    private fun setupWakeLock() {
+        val powerManager = getSystemService(Context.POWER_SERVICE) as PowerManager
+        wakeLock = powerManager.newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, "FakeGPS::MovementLock")
     }
 
     private fun startForegroundService() {
@@ -92,6 +100,9 @@ class CoreLocationService : LifecycleService() {
         currentIndex = 0
         _isAutoWalking.value = true
         
+        // 獲取 WakeLock，防止 CPU 在螢幕關閉時休眠
+        wakeLock?.acquire(2 * 60 * 60 * 1000L /* 2 hours max */)
+        
         autoWalkJob?.cancel()
         autoWalkJob = lifecycleScope.launch {
             var lastLat = _currentLocation.value.first
@@ -100,16 +111,13 @@ class CoreLocationService : LifecycleService() {
             while (isActive && currentIndex < currentPath.size) {
                 val target = currentPath[currentIndex]
                 
-                // 15-20km/h 擬真計算 (18.0 km/h, 1s 步長)
                 val nextLoc = movementEngine.calculateNextLocation(
                     lastLat, lastLng,
                     target.first, target.second,
                     18.0, 1000
                 )
 
-                // 施加抖動
                 val jitteredLoc = movementEngine.applyGaussianJitter(nextLoc.first, nextLoc.second)
-                
                 updateLocation(jitteredLoc.first, jitteredLoc.second)
                 
                 lastLat = jitteredLoc.first
@@ -123,6 +131,7 @@ class CoreLocationService : LifecycleService() {
                 delay(1000)
             }
             _isAutoWalking.value = false
+            if (wakeLock?.isHeld == true) wakeLock?.release()
         }
     }
 
@@ -132,10 +141,13 @@ class CoreLocationService : LifecycleService() {
     fun stopRoute() {
         _isAutoWalking.value = false
         autoWalkJob?.cancel()
+        if (wakeLock?.isHeld == true) {
+            wakeLock?.release()
+        }
     }
 
     /**
-     * 手動設定座標（搖桿或地圖點擊時使用）
+     * 手動設定座標
      */
     fun updateLocation(lat: Double, lng: Double) {
         val jittered = movementEngine.applyGaussianJitter(lat, lng)
@@ -144,6 +156,9 @@ class CoreLocationService : LifecycleService() {
     }
 
     override fun onDestroy() {
+        if (wakeLock?.isHeld == true) {
+            wakeLock?.release()
+        }
         mockLocationManager.removeMockProvider()
         super.onDestroy()
     }
@@ -151,7 +166,6 @@ class CoreLocationService : LifecycleService() {
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         super.onStartCommand(intent, flags, startId)
         
-        // 處理來自 FloatingJoystickService 的簡單指令
         intent?.let {
             val action = it.action
             val lat = it.getDoubleExtra("LAT", -1.0)
