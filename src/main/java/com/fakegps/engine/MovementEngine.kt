@@ -96,4 +96,16 @@ class MovementEngine {
         val c = 2 * atan2(sqrt(a), sqrt(1 - a))
         return r * c
     }
+
+    /**
+     * 計算方位角 (Bearing)
+     */
+    fun calculateBearing(lat1: Double, lon1: Double, lat2: Double, lon2: Double): Float {
+        val l1 = Math.toRadians(lat1)
+        val l2 = Math.toRadians(lat2)
+        val dl = Math.toRadians(lon2 - lon1)
+        val y = sin(dl) * cos(l2)
+        val x = cos(l1) * sin(l2) - sin(l1) * cos(l2) * cos(dl)
+        return ((Math.toDegrees(atan2(y, x)) + 360) % 360).toFloat()
+    }
 }

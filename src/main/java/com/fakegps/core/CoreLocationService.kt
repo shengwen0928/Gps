@@ -146,8 +146,13 @@ class CoreLocationService : LifecycleService() {
                     currentSpeed, 1000
                 )
 
+                // 計算方位角
+                val bearing = movementEngine.calculateBearing(lastLat, lastLng, nextLoc.first, nextLoc.second)
+                // 轉換速度為 m/s (系統要求)
+                val speedMs = (currentSpeed / 3.6).toFloat()
+
                 val jitteredLoc = movementEngine.applyGaussianJitter(nextLoc.first, nextLoc.second)
-                updateLocation(jitteredLoc.first, jitteredLoc.second)
+                updateLocationFull(jitteredLoc.first, jitteredLoc.second, speedMs, bearing)
                 
                 lastLat = jitteredLoc.first
                 lastLng = jitteredLoc.second
@@ -179,9 +184,16 @@ class CoreLocationService : LifecycleService() {
      * 手動設定座標
      */
     fun updateLocation(lat: Double, lng: Double) {
+        updateLocationFull(lat, lng, 0.0f, 0.0f)
+    }
+
+    /**
+     * 更新完整座標特徵
+     */
+    private fun updateLocationFull(lat: Double, lng: Double, speed: Float, bearing: Float) {
         val jittered = movementEngine.applyGaussianJitter(lat, lng)
         val altitude = altitudeEngine.calculateCurrentAltitude()
-        mockLocationManager.setMockLocation(jittered.first, jittered.second, altitude)
+        mockLocationManager.setMockLocation(jittered.first, jittered.second, altitude, speed, bearing)
         _currentLocation.value = jittered
     }
 
