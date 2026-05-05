@@ -70,20 +70,16 @@ class MockLocationManager(private val context: Context) {
         }
     }
 
-    private var lastStatusUpdateTime = 0L
-
     /**
      * 設定模擬位置
      */
     fun setMockLocation(lat: Double, lng: Double, alt: Double, speed: Float = 0.0f, bearing: Float = 0.0f, satellites: Int = 12) {
         val currentTime = System.currentTimeMillis()
-        // 修正：維持 10ms 的微量領先，這是贏過系統仲裁的黃金值
-        val elapsedNanos = SystemClock.elapsedRealtimeNanos() + 10_000_000L
+        val elapsedNanos = SystemClock.elapsedRealtimeNanos()
 
         for (provider in providers) {
-            if (!locationManager.isProviderEnabled(provider)) {
-                try { locationManager.setTestProviderEnabled(provider, true) } catch (e: Exception) {}
-            }
+            // 恢復 v1.8.0 成功的策略：每次寫入前確保 Provider 處於可用狀態
+            updateProviderStatus(provider)
 
             val mockLocation = Location(provider).apply {
                 latitude = lat
@@ -92,39 +88,21 @@ class MockLocationManager(private val context: Context) {
                 this.speed = speed
                 this.bearing = bearing
                 time = currentTime
-                accuracy = 0.5f 
+                accuracy = 1.0f // 恢復標準高精度
                 
                 if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.JELLY_BEAN_MR1) {
                     elapsedRealtimeNanos = elapsedNanos
                 }
                 
-                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                    verticalAccuracyMeters = 0.1f
-                    speedAccuracyMetersPerSecond = 0.01f
-                    bearingAccuracyDegrees = 0.1f
-                }
-                
+                // 簡化 Metadata，回歸基礎但穩定的特徵
                 val bundle = android.os.Bundle()
                 bundle.putInt("satellites", satellites)
-                bundle.putBoolean("mockLocation", false)
-                
-                val gpgga = nmeaEngine.generateGpgga(lat, lng, alt, satellites, currentTime)
-                val gprmc = nmeaEngine.generateGprmc(lat, lng, speed, bearing, currentTime)
-                bundle.putString("nmea_gpgga", gpgga)
-                bundle.putString("nmea_gprmc", gprmc)
-                bundle.putStringArrayList("NMEA", arrayListOf(gpgga, gprmc))
-                
                 extras = bundle
             }
             try {
                 locationManager.setTestProviderLocation(provider, mockLocation)
-                
-                // 修復：狀態更新頻率限制在 1Hz，過度頻繁的狀態心跳會被 Fused 引擎視為不穩定而過濾
-                if (currentTime - lastStatusUpdateTime > 1000) {
-                    locationManager.setTestProviderStatus(provider, android.location.LocationProvider.AVAILABLE, null, currentTime)
-                    lastStatusUpdateTime = currentTime
-                }
             } catch (e: Exception) {
+                // 靜默處理
             }
         }
     }
