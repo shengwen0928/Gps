@@ -11,71 +11,84 @@ import android.os.SystemClock
  */
 class MockLocationManager(private val context: Context) {
     private val locationManager = context.getSystemService(Context.LOCATION_SERVICE) as LocationManager
-    private val providerName = LocationManager.GPS_PROVIDER
+    private val providers = listOf(LocationManager.GPS_PROVIDER, LocationManager.NETWORK_PROVIDER)
 
     /**
-     * 初始化 Mock Provider
-     * 需確保在「開發者選項」中已將此 App 設定為模擬位置應用程式
+     * 初始化 Mock Providers
      */
-    fun setupMockProvider() {
-        try {
-            // 如果已存在則先移除，避免重複添加崩潰
-            if (locationManager.allProviders.contains(providerName)) {
-                try {
-                    locationManager.removeTestProvider(providerName)
-                } catch (e: Exception) {
-                    e.printStackTrace()
+    fun setupMockProvider(): Boolean {
+        var success = true
+        for (provider in providers) {
+            try {
+                if (locationManager.allProviders.contains(provider)) {
+                    locationManager.removeTestProvider(provider)
                 }
+                
+                locationManager.addTestProvider(
+                    provider,
+                    false, false, false, false,
+                    true, true, true,
+                    0, 1
+                )
+                locationManager.setTestProviderEnabled(provider, true)
+                
+                // 設定狀態為可用，這對某些 Android 版本很重要
+                locationManager.setTestProviderStatus(
+                    provider,
+                    android.location.LocationProvider.AVAILABLE,
+                    null,
+                    System.currentTimeMillis()
+                )
+            } catch (e: SecurityException) {
+                success = false
+                e.printStackTrace()
+            } catch (e: Exception) {
+                e.printStackTrace()
             }
-            
-            // 參數說明：提供者名稱, 是否支援高度, 是否支援速度, 是否支援方位, 是否有成本, 支援電池電力, 支援高度, 支援速度, 功率需求, 精準度
-            locationManager.addTestProvider(
-                providerName,
-                true, true, true, false,
-                true, true, true,
-                0, 1
-            )
-            locationManager.setTestProviderEnabled(providerName, true)
-        } catch (e: SecurityException) {
-            // 未在開發者選項中設定為模擬位置 App
-            e.printStackTrace()
-        } catch (e: Exception) {
-            e.printStackTrace()
         }
+        return success
     }
 
     /**
-     * 設定模擬位置
-     * @param lat 緯度
-     * @param lng 經度
-     * @param alt 高度
+     * 設定模擬位置（同時發送到所有 Provider）
      */
     fun setMockLocation(lat: Double, lng: Double, alt: Double) {
-        val mockLocation = Location(providerName).apply {
-            latitude = lat
-            longitude = lng
-            altitude = alt
-            time = System.currentTimeMillis()
-            accuracy = 3.0f
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.JELLY_BEAN_MR1) {
-                elapsedRealtimeNanos = SystemClock.elapsedRealtimeNanos()
+        val currentTime = System.currentTimeMillis()
+        val elapsedNanos = SystemClock.elapsedRealtimeNanos()
+
+        for (provider in providers) {
+            val mockLocation = Location(provider).apply {
+                latitude = lat
+                longitude = lng
+                altitude = alt
+                time = currentTime
+                accuracy = 1.0f // 設定更高的精確度（數值越小越精確）
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.JELLY_BEAN_MR1) {
+                    elapsedRealtimeNanos = elapsedNanos
+                }
+                // 加入必要的 flag
+                val bundle = android.os.Bundle()
+                bundle.putInt("satellites", 10)
+                extras = bundle
             }
-        }
-        try {
-            locationManager.setTestProviderLocation(providerName, mockLocation)
-        } catch (e: Exception) {
-            e.printStackTrace()
+            try {
+                locationManager.setTestProviderLocation(provider, mockLocation)
+            } catch (e: Exception) {
+                e.printStackTrace()
+            }
         }
     }
 
     /**
-     * 移除 Mock Provider
+     * 移除 Mock Providers
      */
     fun removeMockProvider() {
-        try {
-            locationManager.removeTestProvider(providerName)
-        } catch (e: Exception) {
-            e.printStackTrace()
+        for (provider in providers) {
+            try {
+                locationManager.removeTestProvider(provider)
+            } catch (e: Exception) {
+                e.printStackTrace()
+            }
         }
     }
 }

@@ -29,6 +29,9 @@ class CoreLocationService : LifecycleService() {
     private val _currentLocation = MutableStateFlow<Pair<Double, Double>>(Pair(25.0330, 121.5654))
     val currentLocation = _currentLocation.asStateFlow()
 
+    private val _mockProviderStatus = MutableStateFlow(true)
+    val mockProviderStatus = _mockProviderStatus.asStateFlow()
+
     private val _isAutoWalking = MutableStateFlow(false)
     val isAutoWalking = _isAutoWalking.asStateFlow()
 
@@ -53,7 +56,7 @@ class CoreLocationService : LifecycleService() {
         movementEngine = MovementEngine()
         routePlanner = RoutePlanner(movementEngine)
         
-        mockLocationManager.setupMockProvider()
+        _mockProviderStatus.value = mockLocationManager.setupMockProvider()
         startForegroundService()
     }
 

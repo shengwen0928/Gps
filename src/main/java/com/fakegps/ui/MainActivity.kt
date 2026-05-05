@@ -196,6 +196,16 @@ class MainActivity : AppCompatActivity() {
                 }
             }
         }
+
+        lifecycleScope.launch {
+            repeatOnLifecycle(Lifecycle.State.STARTED) {
+                service.mockProviderStatus.collectLatest { success ->
+                    if (!success) {
+                        Toast.makeText(this@MainActivity, "請在「開發者選項」中將此 App 設為模擬位置應用程式", Toast.LENGTH_LONG).show()
+                    }
+                }
+            }
+        }
     }
 
     private fun setupFullscreen() {
