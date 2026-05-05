@@ -26,19 +26,15 @@ class MockLocationManager(private val context: Context) {
                 
                 locationManager.addTestProvider(
                     provider,
-                    false, false, false, false,
+                    true, true, true, false,
                     true, true, true,
-                    0, 1
+                    android.location.Criteria.POWER_LOW,
+                    android.location.Criteria.ACCURACY_FINE
                 )
                 locationManager.setTestProviderEnabled(provider, true)
                 
-                // 設定狀態為可用，這對某些 Android 版本很重要
-                locationManager.setTestProviderStatus(
-                    provider,
-                    android.location.LocationProvider.AVAILABLE,
-                    null,
-                    System.currentTimeMillis()
-                )
+                // 初次設定狀態
+                updateProviderStatus(provider)
             } catch (e: SecurityException) {
                 success = false
                 e.printStackTrace()
@@ -49,24 +45,44 @@ class MockLocationManager(private val context: Context) {
         return success
     }
 
+    private fun updateProviderStatus(provider: String) {
+        try {
+            locationManager.setTestProviderStatus(
+                provider,
+                android.location.LocationProvider.AVAILABLE,
+                null,
+                System.currentTimeMillis()
+            )
+        } catch (e: Exception) {
+            // 某些版本可能不支持
+        }
+    }
+
     /**
-     * 設定模擬位置（同時發送到所有 Provider）
+     * 設定模擬位置
      */
     fun setMockLocation(lat: Double, lng: Double, alt: Double) {
         val currentTime = System.currentTimeMillis()
         val elapsedNanos = SystemClock.elapsedRealtimeNanos()
 
         for (provider in providers) {
+            // 每一次更新位置前，再次確保狀態為可用，強迫 Fused Location 重新計算
+            updateProviderStatus(provider)
+
             val mockLocation = Location(provider).apply {
                 latitude = lat
                 longitude = lng
                 altitude = alt
                 time = currentTime
-                accuracy = 1.0f // 設定更高的精確度（數值越小越精確）
+                accuracy = 1.0f
                 if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.JELLY_BEAN_MR1) {
                     elapsedRealtimeNanos = elapsedNanos
                 }
-                // 加入必要的 flag
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                    verticalAccuracyMeters = 0.5f
+                    speedAccuracyMetersPerSecond = 0.1f
+                    bearingAccuracyDegrees = 0.1f
+                }
                 val bundle = android.os.Bundle()
                 bundle.putInt("satellites", 10)
                 extras = bundle
