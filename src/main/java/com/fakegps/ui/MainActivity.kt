@@ -45,6 +45,14 @@ class MainActivity : AppCompatActivity() {
 
     private var currentPath = listOf<Pair<Double, Double>>()
     
+    private val backgroundLocationPermissionRequest = registerForActivityResult(
+        ActivityResultContracts.RequestPermission()
+    ) { isGranted ->
+        if (!isGranted) {
+            Toast.makeText(this, "需要「一律允許」定位才能在背景穩定執行", Toast.LENGTH_LONG).show()
+        }
+    }
+
     private val locationPermissionRequest = registerForActivityResult(
         ActivityResultContracts.RequestMultiplePermissions()
     ) { permissions ->
@@ -52,9 +60,28 @@ class MainActivity : AppCompatActivity() {
                       permissions[Manifest.permission.ACCESS_COARSE_LOCATION] == true
         if (granted) {
             initCurrentLocation()
-            checkBackgroundLocationPermission()
+            requestBackgroundLocationPermission()
         } else {
             Toast.makeText(this, "需要定位權限才能獲取目前位置", Toast.LENGTH_LONG).show()
+        }
+    }
+
+    private fun requestBackgroundLocationPermission() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            if (ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_BACKGROUND_LOCATION) != PackageManager.PERMISSION_GRANTED) {
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+                    androidx.appcompat.app.AlertDialog.Builder(this)
+                        .setTitle("需要背景定位權限")
+                        .setMessage("為了讓模擬行走在螢幕關閉時仍能持續運作，請在接下來的系統設定中選擇「一律允許」。")
+                        .setPositiveButton("前往設定") { _, _ ->
+                            backgroundLocationPermissionRequest.launch(Manifest.permission.ACCESS_BACKGROUND_LOCATION)
+                        }
+                        .setNegativeButton("取消", null)
+                        .show()
+                } else {
+                    backgroundLocationPermissionRequest.launch(Manifest.permission.ACCESS_BACKGROUND_LOCATION)
+                }
+            }
         }
     }
 
