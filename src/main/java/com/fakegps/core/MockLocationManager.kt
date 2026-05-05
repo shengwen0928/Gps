@@ -21,13 +21,13 @@ class MockLocationManager(private val context: Context) {
      * 初始化 Mock Providers
      */
     fun setupMockProvider(): Boolean {
-        var success = true
+        var gpsAuthorized = false
         for (provider in providers) {
             try {
                 if (locationManager.allProviders.contains(provider)) {
                     locationManager.removeTestProvider(provider)
                 }
-                
+
                 locationManager.addTestProvider(
                     provider,
                     true, true, true, false,
@@ -36,17 +36,22 @@ class MockLocationManager(private val context: Context) {
                     android.location.Criteria.ACCURACY_FINE
                 )
                 locationManager.setTestProviderEnabled(provider, true)
-                
-                // 初次設定狀態
                 updateProviderStatus(provider)
+
+                // 只要 GPS 成功初始化，代表「開發者選項」授權成功
+                if (provider == LocationManager.GPS_PROVIDER) {
+                    gpsAuthorized = true
+                }
             } catch (e: SecurityException) {
-                success = false
-                e.printStackTrace()
+                // 如果是 SecurityException，代表該 Provider 沒權限
+                if (provider == LocationManager.GPS_PROVIDER) {
+                    gpsAuthorized = false
+                }
             } catch (e: Exception) {
-                e.printStackTrace()
+                // 靜默處理其他錯誤（例如 fused 在某些設備不支持 addTestProvider）
             }
         }
-        return success
+        return gpsAuthorized
     }
 
     private fun updateProviderStatus(provider: String) {
